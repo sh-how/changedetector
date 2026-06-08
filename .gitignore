@@ -1,0 +1,17 @@
+.env
+*.log
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+# local user config may contain machine-specific coordinates; keep example committed
+config.yaml
+# control sidecar files written at runtime
+*.pause
+*.stop
+*.run
+# Claude Code machine-local settings/permissions
+.claude/settings.local.json

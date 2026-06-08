@@ -1,0 +1,38 @@
+# changedetector configuration (non-secret).
+# Copy to `config.yaml` and edit. Secrets (Telegram token/chat id) go in `.env`.
+
+# One entry per area to watch. Use `changedetector select --name "Inbox" --write`
+# (or the tray's "Configure area...") to fill in coordinates by dragging a box.
+watchers:
+  - name: Inbox
+    region: {left: 320, top: 180, width: 640, height: 200, monitor: null}
+    # Optional per-area overrides (anything omitted uses the global `detection:` below):
+    # ratio_threshold: 0.08
+    # message: "New mail in Inbox"
+  - name: Chat
+    region: {left: 1500, top: 800, width: 420, height: 180, monitor: null}
+
+# `monitor` (inside region) is an optional 1-based monitor index; when set,
+# left/top are relative to that monitor and resolved to absolute at load time.
+
+capture:
+  poll_interval_seconds: 3.0
+  downscale_factor: 2        # 1 = no downscale
+  grayscale: true
+
+detection:                   # global defaults; a watcher may override any of these
+  intensity_threshold: 25    # 0..255 per-pixel delta for a pixel to count as "changed"
+  ratio_threshold: 0.02      # 0..1 fraction of changed pixels to count as an event
+  settle_ticks: 3            # consecutive still frames required before alerting
+  cooldown_seconds: 30       # minimum gap between alerts; baseline resets after
+
+alert:
+  channel: telegram          # telegram | console
+  message: "Change detected"  # default alert text (per-area `message` overrides it)
+  attach_screenshot: true
+  include_timestamp: true
+
+runtime:
+  blank_frame_policy: skip   # skip = ignore all-black/locked frames (no diff/alert/rebaseline)
+  log_level: INFO
+  log_file: changedetector.log
