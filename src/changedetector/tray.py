@@ -113,7 +113,11 @@ def run_tray(config_path) -> int:
         run_file_path, set_paused, staleness_seconds, stop_file_path,
     )
     from .config import load_app_config
-    from .launcher import spawn_monitor, spawn_remove, spawn_select, spawn_show_areas
+    from .launcher import (
+        spawn_monitor, spawn_profile_create, spawn_profile_switch, spawn_remove,
+        spawn_select, spawn_show_areas,
+    )
+    from .profiles import read_profiles
 
     pause_path = pause_file_path(config_path)
     stop_path = stop_file_path(config_path)
@@ -158,6 +162,28 @@ def run_tray(config_path) -> int:
         except Exception:  # noqa: BLE001 - a bad/missing config just yields an empty submenu
             return []
 
+    def on_new_profile(icon, item):
+        spawn_profile_create(config_path)  # GUI-prompts for the name
+
+    def _make_profile_cb(name):
+        def cb(icon, item):
+            spawn_profile_switch(config_path, name)  # edits config + restarts monitor
+        return cb
+
+    def _make_profile_checked(name):
+        def checked(item):
+            return read_profiles(config_path)[1] == name
+        return checked
+
+    def profile_submenu():
+        names, _active = read_profiles(config_path)
+        for name in names:
+            yield Item(name, _make_profile_cb(name), radio=True,
+                       checked=_make_profile_checked(name))
+        if names:
+            yield Menu.SEPARATOR
+        yield Item("New profile...", on_new_profile)
+
     def _make_remove_cb(name):
         # a factory keeps the callback at exactly (icon, item) — pystray rejects
         # actions with more than 2 params — while capturing this area's name
@@ -191,6 +217,7 @@ def run_tray(config_path) -> int:
         Item("Resume", on_resume, enabled=lambda item: running_now() and paused_now()),
         Item("Stop", on_stop, enabled=lambda item: running_now()),
         Menu.SEPARATOR,
+        Item("Profile", Menu(profile_submenu)),
         Item("Show watched areas", on_show_areas),
         Item("Configure area...", on_configure),
         Item("Remove area", Menu(remove_submenu)),

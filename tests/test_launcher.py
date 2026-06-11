@@ -28,6 +28,23 @@ def test_show_areas_command():
     assert cmd[-2:] == ["--config", "c.yaml"]
 
 
+def test_profile_switch_command():
+    from changedetector.launcher import profile_switch_command
+    cmd = profile_switch_command("c.yaml", "trading", python="PYW")
+    assert cmd[0] == "PYW"
+    assert "profile" in cmd and "switch" in cmd and "trading" in cmd
+    assert cmd[-2:] == ["--config", "c.yaml"]
+
+
+def test_profile_create_command_has_no_name():
+    from changedetector.launcher import profile_create_command
+    cmd = profile_create_command("c.yaml", python="PYW")
+    assert "profile" in cmd and "create" in cmd
+    assert cmd[-2:] == ["--config", "c.yaml"]
+    # no name -> the spawned command GUI-prompts for one
+    assert cmd.index("create") == len(cmd) - 3
+
+
 def test_remove_command_includes_name_and_confirm():
     from changedetector.launcher import remove_command
     cmd = remove_command("c.yaml", "Chat", python="PYW")

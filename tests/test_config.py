@@ -117,6 +117,53 @@ class TestLoadAppConfig:
             load_app_config(str(tmp_path / "nope.yaml"))
 
 
+class TestProfilesResolution:
+    def profiles_data(self, active="work"):
+        return {
+            "active_profile": active,
+            "profiles": {
+                "work": {"watchers": [
+                    {"name": "Inbox", "region": {"left": 0, "top": 0, "width": 10, "height": 10}},
+                ]},
+                "trading": {"watchers": [
+                    {"name": "Chart", "region": {"left": 50, "top": 0, "width": 10, "height": 10}},
+                    {"name": "News", "region": {"left": 70, "top": 0, "width": 10, "height": 10}},
+                ]},
+            },
+            "alert": {"channel": "console"},
+        }
+
+    def test_active_profile_watchers_used(self):
+        cfg, _ = build_config(self.profiles_data(active="trading"), {})
+        assert [w.name for w in cfg.watchers] == ["Chart", "News"]
+
+    def test_missing_active_key_uses_first_profile(self):
+        data = self.profiles_data()
+        del data["active_profile"]
+        cfg, _ = build_config(data, {})
+        assert [w.name for w in cfg.watchers] == ["Inbox"]
+
+    def test_unknown_active_uses_first_profile(self):
+        cfg, _ = build_config(self.profiles_data(active="ghost"), {})
+        assert [w.name for w in cfg.watchers] == ["Inbox"]
+
+    def test_empty_active_profile_raises_helpfully(self):
+        data = self.profiles_data(active="empty")
+        data["profiles"]["empty"] = {"watchers": []}
+        with pytest.raises(ConfigError) as exc:
+            build_config(data, {})
+        assert "empty" in str(exc.value)  # names the profile
+        assert "select" in str(exc.value)  # points at the fix
+
+    def test_empty_profiles_mapping_raises(self):
+        with pytest.raises(ConfigError):
+            build_config({"profiles": {}, "alert": {"channel": "console"}}, {})
+
+    def test_global_detection_defaults_apply_within_profile(self):
+        cfg, _ = build_config(self.profiles_data(), {})
+        assert cfg.watchers[0].detection.ratio_threshold == 0.02
+
+
 class TestLegacySingleRegion:
     def test_single_region_becomes_one_watcher(self):
         data = {

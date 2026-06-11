@@ -42,6 +42,17 @@ def remove_command(config_path, name: str, python: str = None) -> list:
             "--name", name, "--confirm", "--config", str(config_path)]
 
 
+def profile_switch_command(config_path, name: str, python: str = None) -> list:
+    return [python or gui_python(), "-m", "changedetector", "profile", "switch",
+            name, "--config", str(config_path)]
+
+
+def profile_create_command(config_path, python: str = None) -> list:
+    # no name: the spawned process GUI-prompts for one (tray flow)
+    return [python or gui_python(), "-m", "changedetector", "profile", "create",
+            "--config", str(config_path)]
+
+
 def _spawn(argv) -> int:
     creationflags = 0
     if sys.platform.startswith("win"):
@@ -64,3 +75,11 @@ def spawn_show_areas(config_path) -> int:
 
 def spawn_remove(config_path, name: str) -> int:
     return _spawn(remove_command(config_path, name))
+
+
+def spawn_profile_switch(config_path, name: str) -> int:
+    return _spawn(profile_switch_command(config_path, name))
+
+
+def spawn_profile_create(config_path) -> int:
+    return _spawn(profile_create_command(config_path))

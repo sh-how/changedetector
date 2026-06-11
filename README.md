@@ -67,6 +67,27 @@ areas from the system tray — see below.)
 Each area can optionally override the global detection settings and the alert
 message — see `config.example.yaml`.
 
+## Profiles — different sets of areas
+
+A profile is a named set of watched areas (e.g. `work` watching Outlook+Teams,
+`trading` watching a chart). Global settings stay shared; exactly one profile is
+**active**, and `run`, `select`, `remove`, `show-areas`, and `test-alert` all
+operate on it.
+
+```powershell
+.venv\Scripts\python -m changedetector profile list             # all profiles, active marked
+.venv\Scripts\python -m changedetector profile create trading   # new empty profile + switch to it
+.venv\Scripts\python -m changedetector profile switch work      # swap (auto-restarts a running monitor)
+.venv\Scripts\python -m changedetector profile delete trading   # delete (active -> auto-switches first)
+```
+
+Notes: your existing config keeps working — a config without profiles is one
+implicit profile named `default`, migrated automatically on the first
+`profile create`. You can't delete the last profile. Switching to a profile
+with no areas stops the monitor and tells you to add areas with `select`.
+The tray has a **Profile ▸** submenu: the active profile is marked, click
+another to swap, or **New profile…** to create one.
+
 Delete an area you no longer want:
 
 ```powershell
@@ -136,8 +157,9 @@ Prefer not to remember commands? Launch the tray controller:
 
 or just double-click **`changedetector-tray.bat`**. A tray icon appears whose
 color shows the state (grey = stopped, green = running, amber = paused).
-Right-click it for **Start / Pause / Resume / Stop / Show watched areas /
-Configure area… / Remove area ▸ / Status / Quit (stops monitoring)**.
+Right-click it for **Start / Pause / Resume / Stop / Profile ▸ /
+Show watched areas / Configure area… / Remove area ▸ / Status /
+Quit (stops monitoring)**.
 
 The tray controls the monitor through the same control files the CLI uses, so
 the two are interchangeable: the tray can start, pause, or stop a monitor no

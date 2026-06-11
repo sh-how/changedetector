@@ -145,6 +145,27 @@ def _build_watcher(wdata: dict, global_detection: dict, default_message: str) ->
 
 def _build_watchers(data: dict, default_message: str) -> list:
     global_detection = data.get("detection", {})
+
+    profiles = data.get("profiles")
+    if profiles is not None:
+        # Profiles config: monitor the active profile's areas.
+        from .profiles import resolve_active
+
+        _require(isinstance(profiles, dict) and len(profiles) > 0,
+                 "'profiles' must be a non-empty mapping")
+        active = resolve_active(data)
+        prof = profiles[active] or {}
+        raw = prof.get("watchers")
+        _require(
+            isinstance(raw, list) and len(raw) > 0,
+            f"profile '{active}' has no areas - add one with: "
+            "changedetector select --name <name> --write",
+        )
+        watchers = [_build_watcher(w, global_detection, default_message) for w in raw]
+        names = [w.name for w in watchers]
+        _require(len(names) == len(set(names)), "watcher names must be unique")
+        return watchers
+
     raw_watchers = data.get("watchers")
 
     if raw_watchers is not None:

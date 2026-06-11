@@ -28,22 +28,39 @@ def _render_watcher_yaml(name: str, region) -> str:
     )
 
 
+def _area_slot(data: dict):
+    """Return (container, watchers) where select/remove should edit areas.
+
+    With profiles, that's the ACTIVE profile's mapping; otherwise the top level
+    (migrating a legacy single-`region` config into a flat watchers list).
+    """
+    profiles = data.get("profiles")
+    if isinstance(profiles, dict) and profiles:
+        from .profiles import resolve_active
+
+        active = resolve_active(data)
+        container = profiles.get(active) or {}
+        profiles[active] = container
+        watchers = container.get("watchers")
+        return container, list(watchers) if isinstance(watchers, list) else []
+
+    watchers = data.get("watchers")
+    if not isinstance(watchers, list) or not watchers:
+        legacy = data.get("region")
+        watchers = [{"name": "default", "region": legacy}] if isinstance(legacy, dict) else []
+    data.pop("region", None)
+    return data, watchers
+
+
 def _upsert_watcher(config_path: str, name: str, region) -> None:
-    """Add or update a named watcher in the YAML config (comments not preserved)."""
+    """Add or update a named watcher in the active profile (or flat config)."""
     path = Path(config_path)
     data = {}
     if path.is_file():
         with path.open("r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
 
-    watchers = data.get("watchers")
-    if not isinstance(watchers, list) or not watchers:
-        watchers = []
-        legacy = data.get("region")
-        if isinstance(legacy, dict):  # migrate a legacy single-region config
-            watchers.append({"name": "default", "region": legacy})
-    data.pop("region", None)
-
+    container, watchers = _area_slot(data)
     new_region = {
         "left": region.left, "top": region.top,
         "width": region.width, "height": region.height, "monitor": None,
@@ -55,16 +72,17 @@ def _upsert_watcher(config_path: str, name: str, region) -> None:
     else:
         watchers.append({"name": name, "region": new_region})
 
-    data["watchers"] = watchers
+    container["watchers"] = watchers
     with path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, sort_keys=False)
 
 
 def _remove_watcher(config_path: str, name: str) -> str:
-    """Remove a named watcher. Returns "removed", "not_found", or "last".
+    """Remove a named watcher from the active profile (or flat config).
 
-    Refuses to remove the final area (a config needs at least one). Does not
-    write the file unless something actually changes.
+    Returns "removed", "not_found", or "last". Refuses to remove the final area
+    (the active profile needs at least one). Does not write the file unless
+    something actually changes.
     """
     path = Path(config_path)
     if not path.is_file():
@@ -72,26 +90,23 @@ def _remove_watcher(config_path: str, name: str) -> str:
     with path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
 
-    watchers = data.get("watchers")
-    if not isinstance(watchers, list) or not watchers:
-        legacy = data.get("region")
-        watchers = [{"name": "default", "region": legacy}] if isinstance(legacy, dict) else []
-
+    container, watchers = _area_slot(data)
     names = [w.get("name") for w in watchers if isinstance(w, dict)]
     if name not in names:
         return "not_found"
     if len(watchers) <= 1:
         return "last"
 
-    data.pop("region", None)
-    data["watchers"] = [w for w in watchers if not (isinstance(w, dict) and w.get("name") == name)]
+    container["watchers"] = [
+        w for w in watchers if not (isinstance(w, dict) and w.get("name") == name)
+    ]
     with path.open("w", encoding="utf-8") as fh:
         yaml.safe_dump(data, fh, sort_keys=False)
     return "removed"
 
 
-def _prompt_name() -> Optional[str]:
-    """GUI prompt for an area name (so this works when launched by a click)."""
+def _prompt_name(message: str = "Name this area (e.g. Inbox):") -> Optional[str]:
+    """GUI text prompt (so commands work when launched by a tray click)."""
     import tkinter as tk
     from tkinter import simpledialog
 
@@ -99,7 +114,7 @@ def _prompt_name() -> Optional[str]:
     root.withdraw()
     root.attributes("-topmost", True)
     try:
-        return simpledialog.askstring("changedetector", "Name this area (e.g. Inbox):", parent=root)
+        return simpledialog.askstring("changedetector", message, parent=root)
     finally:
         root.destroy()
 
@@ -169,6 +184,95 @@ def cmd_select(args) -> int:
     else:
         print(_render_watcher_yaml(name, region))
         print(f"Add the block above under 'watchers:' in {args.config} (or re-run with --write).")
+    return 0
+
+
+def _stop_monitor_if_running(config_path: str) -> bool:
+    """Request a running monitor to stop. Returns True if one was running."""
+    from .config import read_poll_interval
+    from .control import (
+        is_running, request_stop, run_file_path, staleness_seconds, stop_file_path,
+    )
+
+    run_path = run_file_path(config_path)
+    if not is_running(run_path, staleness_seconds(read_poll_interval(config_path))):
+        return False
+    request_stop(stop_file_path(config_path))
+    return True
+
+
+def _apply_profile_change(config_path: str) -> None:
+    """After the active profile changed: restart a running monitor, or stop it
+    (with guidance) when the new active profile has no areas yet."""
+    from .config import ConfigError, load_app_config
+
+    try:
+        load_app_config(config_path)
+    except ConfigError as exc:
+        if _stop_monitor_if_running(config_path):
+            print(f"Stopped the running monitor: {exc}")
+        else:
+            print(f"Note: {exc}")
+        return
+    if _restart_monitor_if_running(config_path):
+        print("Restarted the running monitor on the new active profile.")
+
+
+def cmd_profile(args) -> int:
+    from .profiles import (
+        create_profile, delete_profile, read_profiles, switch_profile,
+    )
+
+    if args.action == "list":
+        names, active = read_profiles(args.config)
+        if not names:
+            print("No profiles configured yet. Create one with: changedetector profile create <name>")
+            return 0
+        for n in names:
+            print(f"* {n}  (active)" if n == active else f"  {n}")
+        return 0
+
+    name = args.name
+    if args.action == "create" and not name:
+        name = _prompt_name("Name the new profile:")  # tray flow
+    if not name or not name.strip():
+        print("A profile name is required.", file=sys.stderr)
+        return 2
+    name = name.strip()
+
+    if args.action == "create":
+        if create_profile(args.config, name) == "exists":
+            print(f"Profile '{name}' already exists.", file=sys.stderr)
+            return 1
+        print(f"Created profile '{name}' and switched to it.")
+        _apply_profile_change(args.config)
+        return 0
+
+    if args.action == "switch":
+        status = switch_profile(args.config, name)
+        if status == "not_found":
+            print(f"No profile named '{name}'.", file=sys.stderr)
+            return 1
+        if status == "already_active":
+            print(f"Profile '{name}' is already active.")
+            return 0
+        print(f"Switched to profile '{name}'.")
+        _apply_profile_change(args.config)
+        return 0
+
+    # delete
+    status, new_active = delete_profile(args.config, name)
+    if status == "not_found":
+        print(f"No profile named '{name}'.", file=sys.stderr)
+        return 1
+    if status == "last":
+        print(f"Refusing to delete '{name}': it's the only profile.", file=sys.stderr)
+        return 1
+    if new_active:
+        print(f"Deleted profile '{name}'; switched to '{new_active}'.")
+        _apply_profile_change(args.config)
+    else:
+        print(f"Deleted profile '{name}'.")
     return 0
 
 
@@ -360,6 +464,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_remove.add_argument("--name", required=True, help="the area to remove")
     p_remove.add_argument("--confirm", action="store_true",
                           help="ask for confirmation first (used by the tray)")
+
+    p_profile = add("profile", "manage profiles (named sets of watched areas)", cmd_profile)
+    p_profile.add_argument("action", choices=["list", "create", "switch", "delete"],
+                           help="what to do")
+    p_profile.add_argument("name", nargs="?",
+                           help="profile name (create prompts if omitted)")
 
     p_run = add("run", "start monitoring", cmd_run)
     p_run.add_argument("--force", action="store_true", help="start even if one seems to be running")
