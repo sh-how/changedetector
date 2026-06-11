@@ -60,6 +60,36 @@ def _upsert_watcher(config_path: str, name: str, region) -> None:
         yaml.safe_dump(data, fh, sort_keys=False)
 
 
+def _remove_watcher(config_path: str, name: str) -> str:
+    """Remove a named watcher. Returns "removed", "not_found", or "last".
+
+    Refuses to remove the final area (a config needs at least one). Does not
+    write the file unless something actually changes.
+    """
+    path = Path(config_path)
+    if not path.is_file():
+        return "not_found"
+    with path.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+
+    watchers = data.get("watchers")
+    if not isinstance(watchers, list) or not watchers:
+        legacy = data.get("region")
+        watchers = [{"name": "default", "region": legacy}] if isinstance(legacy, dict) else []
+
+    names = [w.get("name") for w in watchers if isinstance(w, dict)]
+    if name not in names:
+        return "not_found"
+    if len(watchers) <= 1:
+        return "last"
+
+    data.pop("region", None)
+    data["watchers"] = [w for w in watchers if not (isinstance(w, dict) and w.get("name") == name)]
+    with path.open("w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False)
+    return "removed"
+
+
 def _prompt_name() -> Optional[str]:
     """GUI prompt for an area name (so this works when launched by a click)."""
     import tkinter as tk
@@ -72,6 +102,49 @@ def _prompt_name() -> Optional[str]:
         return simpledialog.askstring("changedetector", "Name this area (e.g. Inbox):", parent=root)
     finally:
         root.destroy()
+
+
+def _confirm_dialog(message: str) -> bool:
+    """GUI yes/no prompt (used by the tray, which passes --confirm)."""
+    import tkinter as tk
+    from tkinter import messagebox
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        return bool(messagebox.askyesno("changedetector", message, parent=root))
+    finally:
+        root.destroy()
+
+
+def _restart_monitor_if_running(config_path: str) -> bool:
+    """If a monitor is running, stop it and start a fresh one so config changes apply."""
+    import time
+
+    from .config import read_poll_interval
+    from .control import (
+        is_running, request_stop, run_file_path, staleness_seconds, stop_file_path,
+    )
+    from .launcher import spawn_monitor
+
+    run_path = run_file_path(config_path)
+    max_age = staleness_seconds(read_poll_interval(config_path))
+    if not is_running(run_path, max_age):
+        return False
+
+    request_stop(stop_file_path(config_path))
+    for _ in range(100):  # wait up to ~10s for the old monitor to exit (clears heartbeat)
+        if not is_running(run_path, max_age):
+            break
+        time.sleep(0.1)
+    else:
+        print("Warning: the running monitor didn't stop; not restarting. "
+              "Run `changedetector stop`, then start it again.", file=sys.stderr)
+        return False
+
+    spawn_monitor(config_path)
+    return True
 
 
 # --- commands --------------------------------------------------------------
@@ -96,6 +169,48 @@ def cmd_select(args) -> int:
     else:
         print(_render_watcher_yaml(name, region))
         print(f"Add the block above under 'watchers:' in {args.config} (or re-run with --write).")
+    return 0
+
+
+def cmd_remove(args) -> int:
+    if args.confirm and not _confirm_dialog(f"Remove watched area '{args.name}'?"):
+        print("Cancelled.")
+        return 0
+
+    status = _remove_watcher(args.config, args.name)
+    if status == "not_found":
+        print(f"No area named '{args.name}'.", file=sys.stderr)
+        return 1
+    if status == "last":
+        print(f"Refusing to remove '{args.name}': it's the only area "
+              "(a config must keep at least one).", file=sys.stderr)
+        return 1
+
+    print(f"Removed area '{args.name}'.")
+    if _restart_monitor_if_running(args.config):
+        print("Restarted the running monitor to apply the change.")
+    return 0
+
+
+def cmd_show_areas(args) -> int:
+    from .config import load_app_config
+    from .overlay import resolved_areas, show_areas_overlay
+
+    cfg = load_app_config(args.config)  # no secrets needed just to show areas
+    monitors = None
+    if any(w.monitor is not None for w in cfg.watchers):
+        from .capture import Capturer
+        with Capturer() as cap:
+            monitors = cap.monitors()
+
+    areas = resolved_areas(cfg.watchers, monitors)
+    if not areas:
+        print("No areas configured. Add one with: changedetector select --name <name> --write",
+              file=sys.stderr)
+        return 1
+    # The highlight is drawn OUTSIDE each region (see overlay.py), so a running
+    # monitor never captures it — no pausing needed.
+    show_areas_overlay(areas, seconds=args.seconds)
     return 0
 
 
@@ -236,6 +351,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_select = add("select", "interactively drag-select an area to watch", cmd_select)
     p_select.add_argument("--name", help="name for this area (prompts if omitted)")
     p_select.add_argument("--write", action="store_true", help="save the area into the config file")
+
+    p_show_areas = add("show-areas", "highlight the watched areas on screen", cmd_show_areas)
+    p_show_areas.add_argument("--seconds", type=float, default=4.0,
+                              help="how long the highlight stays up (default 4)")
+
+    p_remove = add("remove", "delete a watched area by name", cmd_remove)
+    p_remove.add_argument("--name", required=True, help="the area to remove")
+    p_remove.add_argument("--confirm", action="store_true",
+                          help="ask for confirmation first (used by the tray)")
 
     p_run = add("run", "start monitoring", cmd_run)
     p_run.add_argument("--force", action="store_true", help="start even if one seems to be running")

@@ -19,7 +19,7 @@ log = logging.getLogger("changedetector.selector")
 _MIN_SIZE = 5  # a smaller drag is treated as an accidental click / cancel
 
 
-def _virtual_screen_box(root) -> dict:
+def virtual_screen_box(root) -> dict:
     """Bounding box of all monitors, in the same coords as tkinter x_root."""
     if is_windows():
         import ctypes
@@ -46,7 +46,7 @@ def select_region() -> Optional[Region]:
     import tkinter as tk
 
     root = tk.Tk()
-    vbox = _virtual_screen_box(root)
+    vbox = virtual_screen_box(root)
 
     root.overrideredirect(True)
     root.geometry(f"{vbox['width']}x{vbox['height']}+{vbox['left']}+{vbox['top']}")

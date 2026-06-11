@@ -202,16 +202,21 @@ def _build_secrets(channel: str, env: Mapping[str, str]) -> Secrets:
     return Secrets(telegram_bot_token=token, telegram_chat_id=chat_id)
 
 
-def build_config(data: dict, env: Mapping[str, str]) -> tuple[AppConfig, Secrets]:
-    """Validate a parsed config dict and merge secrets from ``env`` (pure)."""
+def _assemble_app_config(data: dict) -> AppConfig:
+    """Validate and assemble the non-secret AppConfig from a parsed dict."""
     alert = _build_alert(data)
-    cfg = AppConfig(
+    return AppConfig(
         watchers=_build_watchers(data, default_message=alert.message),
         capture=_build_capture(data),
         alert=alert,
         runtime=_build_runtime(data),
     )
-    secrets = _build_secrets(alert.channel, env)
+
+
+def build_config(data: dict, env: Mapping[str, str]) -> tuple[AppConfig, Secrets]:
+    """Validate a parsed config dict and merge secrets from ``env`` (pure)."""
+    cfg = _assemble_app_config(data)
+    secrets = _build_secrets(cfg.alert.channel, env)
     return cfg, secrets
 
 
@@ -231,6 +236,24 @@ def read_poll_interval(config_path, default: float = 5.0) -> float:
         return default
 
 
+def _read_yaml(path) -> dict:
+    path = Path(path)
+    _require(path.is_file(), f"config file not found: {path}")
+    with path.open("r", encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    _require(isinstance(data, dict), "config file must contain a YAML mapping")
+    return data
+
+
+def load_app_config(path) -> AppConfig:
+    """Load and validate the AppConfig (watchers etc.) without requiring secrets.
+
+    Used by commands that only need the watched areas (e.g. show-areas), so they
+    never demand a valid Telegram ``.env``.
+    """
+    return _assemble_app_config(_read_yaml(path))
+
+
 def load_config(path, env: Optional[Mapping[str, str]] = None) -> tuple[AppConfig, Secrets]:
     """Load config from a YAML file, loading ``.env`` and merging os.environ."""
     import os
@@ -241,9 +264,4 @@ def load_config(path, env: Optional[Mapping[str, str]] = None) -> tuple[AppConfi
     if env is None:
         env = os.environ
 
-    path = Path(path)
-    _require(path.is_file(), f"config file not found: {path}")
-    with path.open("r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh) or {}
-    _require(isinstance(data, dict), "config file must contain a YAML mapping")
-    return build_config(data, env)
+    return build_config(_read_yaml(path), env)

@@ -89,6 +89,34 @@ class TestReadPollInterval:
         assert read_poll_interval(str(tmp_path / "nope.yaml"), default=5.0) == 5.0
 
 
+class TestLoadAppConfig:
+    def test_loads_watchers_without_requiring_secrets(self, tmp_path):
+        from changedetector.config import load_app_config
+        p = tmp_path / "c.yaml"
+        p.write_text(
+            "watchers:\n"
+            "  - name: Inbox\n"
+            "    region: {left: 1, top: 2, width: 3, height: 4, monitor: null}\n"
+            "alert: {channel: telegram}\n",  # telegram channel but NO env secrets
+            encoding="utf-8",
+        )
+        cfg = load_app_config(str(p))  # must not raise about missing secrets
+        assert [w.name for w in cfg.watchers] == ["Inbox"]
+        assert cfg.alert.channel == "telegram"
+
+    def test_invalid_config_still_raises(self, tmp_path):
+        from changedetector.config import load_app_config
+        p = tmp_path / "c.yaml"
+        p.write_text("alert: {channel: console}\n", encoding="utf-8")  # no watchers/region
+        with pytest.raises(ConfigError):
+            load_app_config(str(p))
+
+    def test_missing_file_raises(self, tmp_path):
+        from changedetector.config import load_app_config
+        with pytest.raises(ConfigError):
+            load_app_config(str(tmp_path / "nope.yaml"))
+
+
 class TestLegacySingleRegion:
     def test_single_region_becomes_one_watcher(self):
         data = {

@@ -59,7 +59,8 @@ def run_tray(config_path) -> int:
         clear_paused, is_paused, is_running, pause_file_path, request_stop,
         run_file_path, set_paused, staleness_seconds, stop_file_path,
     )
-    from .launcher import spawn_monitor, spawn_select
+    from .config import load_app_config
+    from .launcher import spawn_monitor, spawn_remove, spawn_select, spawn_show_areas
 
     pause_path = pause_file_path(config_path)
     stop_path = stop_file_path(config_path)
@@ -95,6 +96,30 @@ def run_tray(config_path) -> int:
     def on_configure(icon, item):
         spawn_select(config_path)  # prompts for a name, then shows the drag overlay
 
+    def on_show_areas(icon, item):
+        spawn_show_areas(config_path)  # briefly highlights the watched areas on screen
+
+    def area_names():
+        try:
+            return [w.name for w in load_app_config(config_path).watchers]
+        except Exception:  # noqa: BLE001 - a bad/missing config just yields an empty submenu
+            return []
+
+    def _make_remove_cb(name):
+        # a factory keeps the callback at exactly (icon, item) — pystray rejects
+        # actions with more than 2 params — while capturing this area's name
+        def cb(icon, item):
+            spawn_remove(config_path, name)
+        return cb
+
+    def remove_submenu():
+        names = area_names()
+        if not names:
+            yield Item("(no areas)", None, enabled=False)
+            return
+        for name in names:
+            yield Item(name, _make_remove_cb(name))
+
     def on_status(icon, item):
         icon.notify(f"Status: {status_now()}", "changedetector")
 
@@ -110,7 +135,9 @@ def run_tray(config_path) -> int:
         Item("Resume", on_resume, enabled=lambda item: running_now() and paused_now()),
         Item("Stop", on_stop, enabled=lambda item: running_now()),
         Menu.SEPARATOR,
+        Item("Show watched areas", on_show_areas),
         Item("Configure area...", on_configure),
+        Item("Remove area", Menu(remove_submenu)),
         Menu.SEPARATOR,
         Item("Quit tray", on_quit),
     )

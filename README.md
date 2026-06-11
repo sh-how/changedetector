@@ -67,6 +67,30 @@ areas from the system tray — see below.)
 Each area can optionally override the global detection settings and the alert
 message — see `config.example.yaml`.
 
+Delete an area you no longer want:
+
+```powershell
+.venv\Scripts\python -m changedetector remove --name "Chat"
+```
+
+It refuses to remove the last remaining area (a config needs at least one), and
+if a monitor is running it auto-restarts it so the change takes effect right
+away. It's also a tray submenu — **Remove area ▸** (which asks for confirmation
+first). Re-adding is just another `select --name`.
+
+To check that your boxes line up with what you want to watch, highlight them on
+screen:
+
+```powershell
+.venv\Scripts\python -m changedetector show-areas            # ~4s highlight
+.venv\Scripts\python -m changedetector show-areas --seconds 8
+```
+
+This briefly draws a labeled red frame around each watched area (Esc or a click
+closes it early). It's also a tray menu item — **Show watched areas**. The frame
+is drawn just *outside* each region, and the monitor captures exactly the region
+rectangle, so the highlight is never captured and never triggers an alert.
+
 ## Run
 
 ```powershell
@@ -112,7 +136,8 @@ Prefer not to remember commands? Launch the tray controller:
 
 or just double-click **`changedetector-tray.bat`**. A tray icon appears whose
 color shows the state (grey = stopped, green = running, amber = paused).
-Right-click it for **Start / Pause / Resume / Stop / Configure area… / Status**.
+Right-click it for **Start / Pause / Resume / Stop / Show watched areas /
+Configure area… / Remove area ▸ / Status**.
 
 The tray controls the monitor through the same control files the CLI uses, so
 the two are interchangeable: the tray can start, pause, or stop a monitor no
@@ -197,6 +222,6 @@ for a monitor placed left of / above the primary. You can instead set
 
 The pure logic (diff metric + settle/cooldown state machine, multi-area config
 validation, geometry, Telegram payloads, control files, the run loop via
-dependency injection, launcher commands, and tray state) is covered by unit
-tests; screen capture, the selector overlay, and the tray GUI are verified
-manually.
+dependency injection, launcher commands, tray state, and area-highlight
+resolution) is covered by unit tests; screen capture, the selector overlay, the
+area-highlight overlay, and the tray GUI are verified manually.

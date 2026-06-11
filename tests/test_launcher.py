@@ -18,3 +18,21 @@ def test_select_command_without_name_has_no_name_flag():
     cmd = select_command("c.yaml", python="PYW")
     assert "--name" not in cmd
     assert "select" in cmd and "--write" in cmd
+
+
+def test_show_areas_command():
+    from changedetector.launcher import showareas_command
+    cmd = showareas_command("c.yaml", python="PYW")
+    assert cmd[0] == "PYW"
+    assert "show-areas" in cmd
+    assert cmd[-2:] == ["--config", "c.yaml"]
+
+
+def test_remove_command_includes_name_and_confirm():
+    from changedetector.launcher import remove_command
+    cmd = remove_command("c.yaml", "Chat", python="PYW")
+    assert cmd[0] == "PYW"
+    assert "remove" in cmd
+    assert "--name" in cmd and "Chat" in cmd
+    assert "--confirm" in cmd  # tray-spawned removals always confirm
+    assert cmd[-2:] == ["--config", "c.yaml"]

@@ -31,6 +31,17 @@ def select_command(config_path, name: str = None, python: str = None) -> list:
     return cmd
 
 
+def showareas_command(config_path, python: str = None) -> list:
+    return [python or gui_python(), "-m", "changedetector", "show-areas",
+            "--config", str(config_path)]
+
+
+def remove_command(config_path, name: str, python: str = None) -> list:
+    # --confirm: tray-spawned removals always show a GUI yes/no first
+    return [python or gui_python(), "-m", "changedetector", "remove",
+            "--name", name, "--confirm", "--config", str(config_path)]
+
+
 def _spawn(argv) -> int:
     creationflags = 0
     if sys.platform.startswith("win"):
@@ -45,3 +56,11 @@ def spawn_monitor(config_path) -> int:
 
 def spawn_select(config_path, name: str = None) -> int:
     return _spawn(select_command(config_path, name))
+
+
+def spawn_show_areas(config_path) -> int:
+    return _spawn(showareas_command(config_path))
+
+
+def spawn_remove(config_path, name: str) -> int:
+    return _spawn(remove_command(config_path, name))
