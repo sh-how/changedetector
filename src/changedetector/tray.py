@@ -9,6 +9,7 @@ tested; the pystray/Pillow wiring is verified manually.
 from __future__ import annotations
 
 import logging
+import sys
 
 log = logging.getLogger("changedetector.tray")
 
@@ -44,6 +45,58 @@ def _icon_image(color):
     draw = ImageDraw.Draw(img)
     draw.ellipse((8, 8, 56, 56), fill=tuple(color))
     return img
+
+
+def _hover_fixed_icon_class(pystray):
+    """A pystray.Icon subclass that fixes Windows tray-menu mouse tracking.
+
+    pystray (0.19.x) foregrounds the icon window before showing the popup, but
+    the popup is owned by a *different* window (``_menu_hwnd``); per Win32 the
+    menu-owning window must be foreground or the popup won't track the mouse
+    (items don't highlight on hover, and it doesn't dismiss on click-away). This
+    overrides ``_on_notify`` with pystray's own logic, foregrounding the menu's
+    own window. Returns None (use stock pystray) off Windows or if internals
+    differ.
+    """
+    if not sys.platform.startswith("win"):
+        return None
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        from pystray._win32 import win32
+    except Exception:  # noqa: BLE001 - unknown pystray internals -> fall back
+        log.warning("tray hover fix unavailable; using stock pystray menu")
+        return None
+
+    class _HoverFixedIcon(pystray.Icon):
+        def _on_notify(self, wparam, lparam):
+            if lparam == win32.WM_LBUTTONUP:
+                self()
+            elif lparam == win32.WM_RBUTTONUP:
+                # Rebuild the menu NOW, on this thread, before showing it. The
+                # menu must never be rebuilt while displayed: update_menu()
+                # destroys the live HMENU, which kills mouse tracking (no hover
+                # highlight). Rebuilding at open also evaluates enabled-states
+                # and labels at the freshest possible moment.
+                self.update_menu()
+                if not self._menu_handle:
+                    return
+                win32.SetForegroundWindow(self._menu_hwnd)  # menu's own window
+                point = wintypes.POINT()
+                win32.GetCursorPos(ctypes.byref(point))
+                hmenu, descriptors = self._menu_handle
+                index = win32.TrackPopupMenuEx(
+                    hmenu,
+                    win32.TPM_RIGHTALIGN | win32.TPM_BOTTOMALIGN | win32.TPM_RETURNCMD,
+                    point.x, point.y, self._menu_hwnd, None)
+                # Canonical tray-menu recipe (KB135788): nudge the message loop
+                # so the next popup behaves after a click-away dismissal.
+                win32.PostMessage(self._menu_hwnd, 0, 0, 0)  # WM_NULL
+                if index > 0:
+                    descriptors[index - 1](self)
+
+    return _HoverFixedIcon
 
 
 def run_tray(config_path) -> int:
@@ -124,6 +177,9 @@ def run_tray(config_path) -> int:
         icon.notify(f"Status: {status_now()}", "changedetector")
 
     def on_quit(icon, item):
+        # Quit stops the monitor too (a running monitor sees the stop file and
+        # exits within one poll interval), then closes the tray.
+        request_stop(stop_path)
         icon.visible = False
         icon.stop()
 
@@ -139,10 +195,13 @@ def run_tray(config_path) -> int:
         Item("Configure area...", on_configure),
         Item("Remove area", Menu(remove_submenu)),
         Menu.SEPARATOR,
-        Item("Quit tray", on_quit),
+        Item("Quit (stops monitoring)", on_quit),
     )
 
-    icon = pystray.Icon("changedetector", _icon_image(_COLORS["Stopped"]), "changedetector", menu)
+    icon_cls = _hover_fixed_icon_class(pystray)
+    rebuilds_menu_on_open = icon_cls is not None
+    icon_cls = icon_cls or pystray.Icon
+    icon = icon_cls("changedetector", _icon_image(_COLORS["Stopped"]), "changedetector", menu)
 
     def setup(icon):
         icon.visible = True
@@ -153,7 +212,13 @@ def run_tray(config_path) -> int:
                     st = tray_state(running_now(), paused_now())
                     icon.icon = _icon_image(st["color"])
                     icon.title = f"changedetector: {st['status']}"
-                    icon.update_menu()
+                    # Never rebuild the menu from this thread on Windows: doing
+                    # so destroys the HMENU the user may have open, which kills
+                    # hover highlighting. The hover-fixed icon rebuilds the menu
+                    # each time it is opened instead. (Stock-pystray fallback
+                    # keeps the periodic rebuild so states don't go stale.)
+                    if not rebuilds_menu_on_open:
+                        icon.update_menu()
                 except Exception:  # noqa: BLE001 - keep the poller alive on any GUI/FS error
                     log.exception("tray poll error")
                 time.sleep(2)

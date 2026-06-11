@@ -137,11 +137,13 @@ Prefer not to remember commands? Launch the tray controller:
 or just double-click **`changedetector-tray.bat`**. A tray icon appears whose
 color shows the state (grey = stopped, green = running, amber = paused).
 Right-click it for **Start / Pause / Resume / Stop / Show watched areas /
-Configure area… / Remove area ▸ / Status**.
+Configure area… / Remove area ▸ / Status / Quit (stops monitoring)**.
 
 The tray controls the monitor through the same control files the CLI uses, so
 the two are interchangeable: the tray can start, pause, or stop a monitor no
-matter how it was launched, and closing the tray leaves the monitor running.
+matter how it was launched. **Quit** stops the monitor and then closes the tray.
+To keep a headless monitor running without the tray, leave it running (started
+via `run` / `run-hidden.bat`) and just don't open the tray, or use the CLI.
 
 ## Other commands
 
