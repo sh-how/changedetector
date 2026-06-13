@@ -1,250 +1,109 @@
 # changedetector
 
-A headless tool that watches one or more fixed areas of your screen and sends a
-**Telegram** alert when something visually changes in them — a new email row, a
-new chat message, a status light turning red. Inspired by
-[changedetection.io](https://github.com/dgtlmoon/changedetection.io), but for
-local *screen regions* instead of a web page.
+Watch an area of your screen and get a **Telegram** alert the moment something
+changes there — a new email, a new chat message, a status light turning red.
+It runs quietly in the background. (Windows; needs Python 3.10+.)
 
-It compares successive screenshots of each area (pixel diff), waits for the
-change to **settle**, and then sends one alert (optionally with a screenshot of
-that area). A cooldown prevents spam. Each area is independent and alerts are
-labeled with the area's name.
+## Setup
 
-## How it works
-
-```
-capture region (mss) → grayscale + downscale → pixel diff vs baseline
-   → settle/cooldown state machine → Telegram alert (text + screenshot)
-```
-
-- **Pixel diff:** a pixel counts as "changed" only if its intensity moves by
-  more than `intensity_threshold`; an *event* fires only if more than
-  `ratio_threshold` of the area changed. This rejects noise (anti-aliasing,
-  a blinking cursor) while catching real updates.
-- **Settle + cooldown:** alerts fire once, after the change stops animating for
-  `settle_ticks` polls, then stay quiet for `cooldown_seconds`.
-
-## Install
-
-Requires Python 3.10+ (3.11 recommended). On Windows the standard CPython build
-includes `tkinter`, which the region picker needs.
+**1. Install** (one time). Install Python from [python.org](https://www.python.org/downloads/), then:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install -e .
-# for running the tests:
-.venv\Scripts\python -m pip install -e ".[dev]"
 ```
 
-## Configure
+**2. Add your config files:**
 
-1. **Secrets** — copy `.env.example` to `.env` and fill in your Telegram bot
-   credentials (see *Telegram setup* below). `.env` is gitignored.
+```powershell
+copy .env.example .env
+copy config.example.yaml config.yaml
+```
 
-   ```
-   CHANGEDETECTOR_TELEGRAM_BOT_TOKEN=123456789:AA...
-   CHANGEDETECTOR_TELEGRAM_CHAT_ID=987654321
-   ```
+Open `.env` and paste in your Telegram bot token and chat id
+(see [Getting your Telegram details](#getting-your-telegram-details) below).
 
-2. **Settings** — copy `config.example.yaml` to `config.yaml` and adjust. The
-   main thing to set is the area(s) to watch (next step).
-
-## Configure the areas to watch
-
-Add one named area at a time by dragging a box over it:
+**3. Pick what to watch** — a box appears; drag it over the area (e.g. your inbox):
 
 ```powershell
 .venv\Scripts\python -m changedetector select --name "Inbox" --write
 ```
 
-A translucent overlay covers all monitors. Drag the box (Esc cancels); with
-`--write` the area is saved into `config.yaml` under `watchers:`. Run it again
-with a different `--name` to add more areas; re-using a name updates that area.
-Without `--write` the YAML block is printed for you to paste. (You can also add
-areas from the system tray — see below.)
+Run it again with a different name to watch more than one area.
 
-Each area can optionally override the global detection settings and the alert
-message — see `config.example.yaml`.
-
-## Profiles — different sets of areas
-
-A profile is a named set of watched areas (e.g. `work` watching Outlook+Teams,
-`trading` watching a chart). Global settings stay shared; exactly one profile is
-**active**, and `run`, `select`, `remove`, `show-areas`, and `test-alert` all
-operate on it.
+**4. Test it:**
 
 ```powershell
-.venv\Scripts\python -m changedetector profile list             # all profiles, active marked
-.venv\Scripts\python -m changedetector profile create trading   # new empty profile + switch to it
-.venv\Scripts\python -m changedetector profile switch work      # swap (auto-restarts a running monitor)
-.venv\Scripts\python -m changedetector profile delete trading   # delete (active -> auto-switches first)
+.venv\Scripts\python -m changedetector test-alert
 ```
 
-Notes: your existing config keeps working — a config without profiles is one
-implicit profile named `default`, migrated automatically on the first
-`profile create`. You can't delete the last profile. Switching to a profile
-with no areas stops the monitor and tells you to add areas with `select`.
-The tray has a **Profile ▸** submenu: the active profile is marked, click
-another to swap, or **New profile…** to create one.
+You should get a Telegram message with a screenshot of each watched area. If you
+do, you're set.
 
-Delete an area you no longer want:
-
-```powershell
-.venv\Scripts\python -m changedetector remove --name "Chat"
-```
-
-It refuses to remove the last remaining area (a config needs at least one), and
-if a monitor is running it auto-restarts it so the change takes effect right
-away. It's also a tray submenu — **Remove area ▸** (which asks for confirmation
-first). Re-adding is just another `select --name`.
-
-To check that your boxes line up with what you want to watch, highlight them on
-screen:
-
-```powershell
-.venv\Scripts\python -m changedetector show-areas            # ~4s highlight
-.venv\Scripts\python -m changedetector show-areas --seconds 8
-```
-
-This briefly draws a labeled red frame around each watched area (Esc or a click
-closes it early). It's also a tray menu item — **Show watched areas**. The frame
-is drawn just *outside* each region, and the monitor captures exactly the region
-rectangle, so the highlight is never captured and never triggers an alert.
-
-## Run
+## Run it
 
 ```powershell
 .venv\Scripts\python -m changedetector run
 ```
 
-Leave it running. When a watched area changes and settles, you get a Telegram
-message labeled with the area name. Stop it with Ctrl-C, or from anywhere
-(works on a headless monitor too):
+Leave it running — you'll get a Telegram alert (with a screenshot) whenever a
+watched area changes. Press `Ctrl-C` to stop.
+
+## The easy way — the tray
+
+Don't want to type commands? Double-click **`changedetector-tray.bat`**. A tray
+icon appears whose colour shows the state (grey = stopped, green = running,
+amber = paused). Right-click it to **Start, Pause/Resume, Stop, switch Profile,
+show or add/remove areas, and Quit** — everything below, by clicking.
+
+To have it start automatically when you log in, put a shortcut to
+`changedetector-tray.bat` in your Windows Startup folder (press `Win+R`, type
+`shell:startup`, drop the shortcut there).
+
+## Everyday commands
 
 ```powershell
-.venv\Scripts\python -m changedetector stop
+.venv\Scripts\python -m changedetector pause      # silence alerts while you work
+.venv\Scripts\python -m changedetector resume     # turn them back on
+.venv\Scripts\python -m changedetector stop       # stop the monitor
+.venv\Scripts\python -m changedetector status     # running / paused / not running
+.venv\Scripts\python -m changedetector show-areas # flash a box around each watched area
+.venv\Scripts\python -m changedetector remove --name "Inbox"   # delete an area
 ```
 
-## Pausing while you work
+All of these are in the tray menu too. Run `changedetector --help` for the full list.
 
-When you're actively using the inbox yourself, silence alerts without stopping
-the monitor:
+## Profiles (optional)
+
+A profile is a named set of areas — e.g. a `work` set and a `trading` set — that
+you switch between. One is active at a time, and the areas you add/remove apply
+to it.
 
 ```powershell
-.venv\Scripts\python -m changedetector pause     # suppress alerts
-.venv\Scripts\python -m changedetector resume    # re-enable
-.venv\Scripts\python -m changedetector status    # -> running / running (paused) / not running
+.venv\Scripts\python -m changedetector profile create trading   # new set, switches to it
+.venv\Scripts\python -m changedetector profile switch work      # switch sets
+.venv\Scripts\python -m changedetector profile list             # see them all
 ```
 
-These work against a running monitor (including a headless one) — `pause`
-creates a small `config.pause` file next to your config that the monitor checks
-each tick; `resume` deletes it. **On resume the baseline is reset**, so anything
-that changed while you were working is absorbed and won't trigger a burst of
-alerts — you only get alerted on genuinely new activity afterward. Pause is
-global (it covers all areas). You can also pause/resume from the system tray.
+Or use the tray's **Profile ▸** menu.
 
-## System tray — control without typing
+## Getting your Telegram details
 
-Prefer not to remember commands? Launch the tray controller:
-
-```powershell
-.venv\Scripts\python -m changedetector tray
-```
-
-or just double-click **`changedetector-tray.bat`**. A tray icon appears whose
-color shows the state (grey = stopped, green = running, amber = paused).
-Right-click it for **Start / Pause / Resume / Stop / Profile ▸ /
-Show watched areas / Configure area… / Remove area ▸ / Status /
-Quit (stops monitoring)**.
-
-The tray controls the monitor through the same control files the CLI uses, so
-the two are interchangeable: the tray can start, pause, or stop a monitor no
-matter how it was launched. **Quit** stops the monitor and then closes the tray.
-To keep a headless monitor running without the tray, start it with
-`changedetector run` (or `pythonw -m changedetector run` for no console window)
-and just don't open the tray.
-
-## Other commands
-
-```powershell
-.venv\Scripts\python -m changedetector test-alert    # one labeled test alert per area (validates token + screenshots)
-.venv\Scripts\python -m changedetector show-config   # print the resolved config (no secrets)
-```
-
-Run `changedetector --help` (or `<command> --help`) for the full command list.
-
-Tip: set `channel: console` in `config.yaml` for a dry run with no Telegram —
-alerts are written to the log instead.
-
-## Telegram setup
-
-1. Message [@BotFather](https://t.me/BotFather), send `/newbot`, follow the
-   prompts, and copy the **bot token**.
+1. In Telegram, message **[@BotFather](https://t.me/BotFather)**, send `/newbot`,
+   follow the prompts, and copy the **bot token**.
 2. Send any message to your new bot.
-3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and read
-   `result[].message.chat.id` — that's your **chat id**.
-4. Put both in `.env`, then run `changedetector test-alert`.
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and copy
+   the **chat id** (`result[].message.chat.id`).
+4. Put both in `.env`.
 
-## Tuning detection
+Tip: set `channel: console` in `config.yaml` to try everything without Telegram —
+alerts just print to the log instead.
 
-In `config.yaml` under `detection`:
+## If something's off
 
-| Setting | Effect |
-|---|---|
-| `intensity_threshold` (0–255) | Higher = ignore more per-pixel noise. |
-| `ratio_threshold` (0–1) | Higher = a larger area must change to count. Raise it if you get false alarms; lower it to catch small changes. |
-| `settle_ticks` | How many still polls before alerting. Higher = wait longer for things to stop moving. |
-| `cooldown_seconds` | Minimum gap between alerts. |
-
-`capture.poll_interval_seconds` controls how often the screen is sampled.
-
-## Running headless / on startup
-
-Screen capture needs an **interactive, unlocked** desktop session, so run it as
-*your* user (not a Windows service / SYSTEM, which sees a black screen).
-
-- **No console window:** double-click `changedetector-tray.bat`, which launches
-  the tray via `pythonw.exe`; start the monitor from its menu. Monitor output
-  goes to the log file (`runtime.log_file`). For just the monitor with no
-  console, run `pythonw -m changedetector run`.
-- **Stop a headless monitor:** `changedetector stop`, or the tray's **Stop**.
-- **Start at logon (Task Scheduler)** — point it at the tray (recommended, so
-  you can start/stop later by hand) or the bare monitor:
-
-  ```powershell
-  schtasks /create /tn "changedetector" /sc onlogon /rl limited ^
-    /tr "\"D:\Projects\Personal\changedetector\.venv\Scripts\pythonw.exe\" -m changedetector tray --config \"D:\Projects\Personal\changedetector\config.yaml\""
-  ```
-
-  In Task Scheduler, ensure **"Run only when user is logged on"** is selected.
-
-## Multi-monitor & DPI
-
-The app makes itself per-monitor **DPI-aware** at startup so the region picker
-(tkinter) and the capture (mss) share one **physical-pixel** coordinate space.
-Regions are stored in absolute virtual-screen coordinates, which may be negative
-for a monitor placed left of / above the primary. You can instead set
-`region.monitor` (1-based) to give `left`/`top` relative to a specific monitor.
-
-## Troubleshooting
-
-- **Alerts when I lock/unlock the PC** — shouldn't happen: locked sessions
-  capture as black frames and are skipped (`runtime.blank_frame_policy: skip`).
-  If your lock screen isn't fully black, lower the watched region off it.
-- **Wrong area captured** — re-run `select`; this is usually a DPI-scaling
-  mismatch that the DPI-awareness step fixes. Verify with `test-alert`, which
-  attaches a screenshot of exactly what's being captured.
-- **Too many / too few alerts** — tune `ratio_threshold` and `settle_ticks`.
-
-## Tests
-
-```powershell
-.venv\Scripts\python -m pytest
-```
-
-The pure logic (diff metric + settle/cooldown state machine, multi-area config
-validation, geometry, Telegram payloads, control files, the run loop via
-dependency injection, launcher commands, tray state, and area-highlight
-resolution) is covered by unit tests; screen capture, the selector overlay, the
-area-highlight overlay, and the tray GUI are verified manually.
+- **Too many or too few alerts** — in `config.yaml`, raise `ratio_threshold` for
+  fewer false alarms, or lower it to catch smaller changes.
+- **Wrong spot is being watched** — run `select` again, then `test-alert` to see
+  exactly what's captured.
+- **No alerts while the PC is locked** — expected: a locked screen can't be read.
+  Keep the machine unlocked (you can switch the monitor off).
