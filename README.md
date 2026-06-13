@@ -142,10 +142,7 @@ creates a small `config.pause` file next to your config that the monitor checks
 each tick; `resume` deletes it. **On resume the baseline is reset**, so anything
 that changed while you were working is absorbed and won't trigger a burst of
 alerts — you only get alerted on genuinely new activity afterward. Pause is
-global (it covers all areas).
-
-Double-clickable shortcuts are included: `pause.bat` and `resume.bat` — or use
-the system tray below.
+global (it covers all areas). You can also pause/resume from the system tray.
 
 ## System tray — control without typing
 
@@ -164,8 +161,9 @@ Quit (stops monitoring)**.
 The tray controls the monitor through the same control files the CLI uses, so
 the two are interchangeable: the tray can start, pause, or stop a monitor no
 matter how it was launched. **Quit** stops the monitor and then closes the tray.
-To keep a headless monitor running without the tray, leave it running (started
-via `run` / `run-hidden.bat`) and just don't open the tray, or use the CLI.
+To keep a headless monitor running without the tray, start it with
+`changedetector run` (or `pythonw -m changedetector run` for no console window)
+and just don't open the tray.
 
 ## Other commands
 
@@ -206,9 +204,10 @@ In `config.yaml` under `detection`:
 Screen capture needs an **interactive, unlocked** desktop session, so run it as
 *your* user (not a Windows service / SYSTEM, which sees a black screen).
 
-- **No console window:** double-click `run-hidden.bat` (monitor) or
-  `changedetector-tray.bat` (tray) — both launch via `pythonw.exe`. Monitor
-  output goes to the log file (`runtime.log_file`).
+- **No console window:** double-click `changedetector-tray.bat`, which launches
+  the tray via `pythonw.exe`; start the monitor from its menu. Monitor output
+  goes to the log file (`runtime.log_file`). For just the monitor with no
+  console, run `pythonw -m changedetector run`.
 - **Stop a headless monitor:** `changedetector stop`, or the tray's **Stop**.
 - **Start at logon (Task Scheduler)** — point it at the tray (recommended, so
   you can start/stop later by hand) or the bare monitor:
