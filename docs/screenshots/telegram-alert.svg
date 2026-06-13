@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="460" height="250" viewBox="0 0 460 250" font-family="Segoe UI, system-ui, Arial, sans-serif">
+  <rect x="6" y="6" width="448" height="238" rx="14" fill="#cdd5de"/>
+  <rect x="4" y="4" width="448" height="238" rx="14" fill="#e9eef3"/>
+  <!-- header -->
+  <path d="M4 18 a14 14 0 0 1 14 -14 h420 a14 14 0 0 1 14 14 v32 h-448 z" fill="#5288c1"/>
+  <circle cx="32" cy="28" r="14" fill="#ffffff"/>
+  <text x="32" y="33" text-anchor="middle" font-size="13" font-weight="700" fill="#5288c1">CD</text>
+  <text x="56" y="25" font-size="15" font-weight="700" fill="#ffffff">changedetector</text>
+  <text x="56" y="41" font-size="11" fill="#d4e2f2">bot</text>
+  <!-- message bubble -->
+  <rect x="18" y="64" width="330" height="168" rx="12" fill="#ffffff" stroke="#d6dde4"/>
+  <!-- region snapshot thumbnail -->
+  <rect x="30" y="76" width="306" height="92" rx="6" fill="#f6f8fa" stroke="#e1e4e8"/>
+  <!-- faux inbox rows; top one is the new (red) email -->
+  <rect x="40" y="86" width="286" height="20" rx="4" fill="#fff0f0" stroke="#ffd0d0"/>
+  <circle cx="52" cy="96" r="4" fill="#ff3030"/>
+  <rect x="64" y="92" width="150" height="8" rx="4" fill="#c0202a"/>
+  <rect x="276" y="92" width="40" height="8" rx="4" fill="#e88"/>
+  <rect x="40" y="114" width="180" height="7" rx="3.5" fill="#c8ced6"/>
+  <rect x="40" y="130" width="220" height="7" rx="3.5" fill="#d3d9e0"/>
+  <rect x="40" y="146" width="150" height="7" rx="3.5" fill="#dde2e8"/>
+  <!-- alert text -->
+  <text x="30" y="190" font-size="15" font-weight="700" fill="#1f2328">Inbox: Change detected</text>
+  <text x="30" y="210" font-size="11.5" fill="#8a9099">2026-06-14 09:42:11</text>
+  <text x="336" y="224" text-anchor="end" font-size="10" fill="#9aa7b8">09:42</text>
+  <text x="350" y="224" text-anchor="end" font-size="10" fill="#5aa0e8">✓✓</text>
+</svg>

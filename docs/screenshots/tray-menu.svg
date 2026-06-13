@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="392" viewBox="0 0 300 392" font-family="Segoe UI, system-ui, Arial, sans-serif">
+  <rect width="300" height="392" rx="10" fill="#eef1f5"/>
+  <!-- tray icon + state -->
+  <circle cx="26" cy="26" r="9" fill="#2da44e"/>
+  <text x="42" y="31" font-size="13" font-weight="600" fill="#1f2328">changedetector: Running</text>
+
+  <!-- menu panel (with soft shadow) -->
+  <rect x="20" y="50" width="262" height="328" rx="8" fill="#c9d0d8"/>
+  <rect x="18" y="48" width="262" height="328" rx="8" fill="#ffffff" stroke="#cfd6dd"/>
+
+  <!-- info row -->
+  <text x="36" y="74" font-size="12.5" fill="#8a9099">Status: Running</text>
+  <line x1="30" y1="86" x2="268" y2="86" stroke="#e6e9ee"/>
+
+  <!-- Start (disabled) -->
+  <text x="36" y="108" font-size="13" fill="#b3b9c0">Start</text>
+  <!-- Pause (hovered) -->
+  <rect x="24" y="118" width="250" height="26" rx="5" fill="#2f6fed"/>
+  <text x="36" y="135" font-size="13" fill="#ffffff">Pause</text>
+  <!-- Resume (disabled) -->
+  <text x="36" y="163" font-size="13" fill="#b3b9c0">Resume</text>
+  <!-- Stop -->
+  <text x="36" y="191" font-size="13" fill="#1f2328">Stop</text>
+  <line x1="30" y1="204" x2="268" y2="204" stroke="#e6e9ee"/>
+
+  <!-- Profile (submenu) -->
+  <text x="36" y="226" font-size="13" fill="#1f2328">Profile</text>
+  <text x="266" y="226" text-anchor="end" font-size="13" fill="#8a9099">&#9656;</text>
+  <!-- Show watched areas -->
+  <text x="36" y="254" font-size="13" fill="#1f2328">Show watched areas</text>
+  <!-- Configure -->
+  <text x="36" y="282" font-size="13" fill="#1f2328">Configure area&#8230;</text>
+  <!-- Remove (submenu) -->
+  <text x="36" y="310" font-size="13" fill="#1f2328">Remove area</text>
+  <text x="266" y="310" text-anchor="end" font-size="13" fill="#8a9099">&#9656;</text>
+  <line x1="30" y1="323" x2="268" y2="323" stroke="#e6e9ee"/>
+
+  <!-- Quit -->
+  <text x="36" y="347" font-size="13" fill="#1f2328">Quit (stops monitoring)</text>
+</svg>

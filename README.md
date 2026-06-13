@@ -4,6 +4,12 @@ Watch an area of your screen and get a **Telegram** alert the moment something
 changes there — a new email, a new chat message, a status light turning red.
 It runs quietly in the background. (Windows; needs Python 3.10+.)
 
+<p align="center">
+  <img src="docs/screenshots/telegram-alert.svg" width="430" alt="Example Telegram alert with a snapshot of the changed area">
+</p>
+
+<sub>Illustrations below are mockups of the interface, not literal screenshots.</sub>
+
 ## Setup
 
 **1. Install** (one time). Install Python from [python.org](https://www.python.org/downloads/), then:
@@ -29,7 +35,12 @@ Open `.env` and paste in your Telegram bot token and chat id
 .venv\Scripts\python -m changedetector select --name "Inbox" --write
 ```
 
-Run it again with a different name to watch more than one area.
+Run it again with a different name to watch more than one area. A red frame
+marks each watched area (run `show-areas` any time to flash it on screen):
+
+<p align="center">
+  <img src="docs/screenshots/watched-area.svg" width="440" alt="A red frame labeling the watched inbox area">
+</p>
 
 **4. Test it:**
 
@@ -55,6 +66,10 @@ Don't want to type commands? Double-click **`changedetector-tray.bat`**. A tray
 icon appears whose colour shows the state (grey = stopped, green = running,
 amber = paused). Right-click it to **Start, Pause/Resume, Stop, switch Profile,
 show or add/remove areas, and Quit** — everything below, by clicking.
+
+<p align="center">
+  <img src="docs/screenshots/tray-menu.svg" width="260" alt="The tray right-click menu">
+</p>
 
 To have it start automatically when you log in, put a shortcut to
 `changedetector-tray.bat` in your Windows Startup folder (press `Win+R`, type
