@@ -90,10 +90,12 @@ All of these are in the tray menu too. Run `changedetector --help` for the full 
 
 ## Control from Telegram
 
-While the monitor is running, you can pause and resume it by messaging your bot:
+While the monitor is running, you can control it by messaging your bot:
 
 - **`/pause`** — silence alerts
 - **`/resume`** — turn them back on
+- **`/areas`** — show what's currently being watched (and the active profile)
+- **`/help`** — list the commands
 
 The bot replies to confirm. It only obeys messages from *your* chat (anyone else
 is ignored), and it uses long-polling, so no setup beyond your existing bot is

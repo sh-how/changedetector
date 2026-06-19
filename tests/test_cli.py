@@ -113,20 +113,21 @@ class TestStartTelegramCommands:
     def test_none_for_console_channel(self, tmp_path):
         from changedetector.cli import _start_telegram_commands
         cfg, secrets = self._cfg(channel="console")
-        assert _start_telegram_commands(cfg, secrets, tmp_path / "c.pause") is None
+        assert _start_telegram_commands(cfg, secrets, tmp_path / "c.pause", str(tmp_path / "x.yaml")) is None
 
     def test_none_when_disabled(self, tmp_path):
         from changedetector.cli import _start_telegram_commands
         cfg, secrets = self._cfg(channel="telegram", enabled=False)
-        assert _start_telegram_commands(cfg, secrets, tmp_path / "c.pause") is None
+        assert _start_telegram_commands(cfg, secrets, tmp_path / "c.pause", str(tmp_path / "x.yaml")) is None
 
-    def test_starts_poller_for_telegram(self, tmp_path, monkeypatch):
+    def test_starts_poller_for_telegram_with_area_names(self, tmp_path, monkeypatch):
         import changedetector.telegram_commands as tc
         started = {}
 
         class FakePoller:
-            def __init__(self, token, chat_id, pause_path, notifier=None):
+            def __init__(self, token, chat_id, pause_path, notifier=None, area_names=None, profile=None):
                 started["init"] = (token, chat_id)
+                started["area_names"] = area_names
 
             def run(self):
                 started["ran"] = True
@@ -137,9 +138,10 @@ class TestStartTelegramCommands:
         monkeypatch.setattr(tc, "CommandPoller", FakePoller)
         from changedetector.cli import _start_telegram_commands
         cfg, secrets = self._cfg(channel="telegram")
-        poller = _start_telegram_commands(cfg, secrets, tmp_path / "c.pause")
+        poller = _start_telegram_commands(cfg, secrets, tmp_path / "c.pause", str(tmp_path / "x.yaml"))
         assert isinstance(poller, FakePoller)
         assert started["init"] == ("t", "1")
+        assert started["area_names"] == ["A"]  # from cfg.watchers
 
 
 def _profiles_cfg(tmp_path, active="work"):

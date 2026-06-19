@@ -54,6 +54,10 @@ class TestParseCommands:
     def test_empty(self):
         assert parse_commands({"ok": True, "result": []}, "42") == []
 
+    def test_help_and_areas_recognized(self):
+        data = resp(upd(1, 42, "/help"), upd(2, 42, "/areas"))
+        assert parse_commands(data, "42") == ["help", "areas"]
+
 
 class TestNextOffset:
     def test_advances_past_max(self):
@@ -85,6 +89,29 @@ class TestApplyCommand:
     def test_unknown_returns_none(self, tmp_path):
         assert apply_command("explode", tmp_path / "c.pause") is None
 
+    def test_help_lists_commands_no_side_effect(self, tmp_path):
+        from changedetector.control import is_paused
+        p = tmp_path / "c.pause"
+        reply = apply_command("help", p)
+        for token in ("/pause", "/resume", "/areas", "/help"):
+            assert token in reply
+        assert is_paused(p) is False  # read-only
+
+    def test_areas_lists_watched_areas(self, tmp_path):
+        reply = apply_command("areas", tmp_path / "c.pause", area_names=["Inbox", "Chat"])
+        assert "Inbox" in reply and "Chat" in reply
+        assert "2" in reply
+        assert "Profile" not in reply  # no profile -> no profile line
+
+    def test_areas_includes_profile_when_set(self, tmp_path):
+        reply = apply_command("areas", tmp_path / "c.pause", area_names=["Inbox"], profile="work")
+        assert "Profile: work" in reply
+        assert "Inbox" in reply
+
+    def test_areas_with_none_is_graceful(self, tmp_path):
+        reply = apply_command("areas", tmp_path / "c.pause", area_names=None)
+        assert "no areas" in reply.lower()
+
 
 def fake_session(json_obj):
     s = mock.Mock()
@@ -113,6 +140,15 @@ class TestCommandPoller:
         poller.poll_once()
         assert is_paused(p) is False
         notifier.send.assert_not_called()
+
+    def test_poll_once_areas_reports_watched_areas(self, tmp_path):
+        notifier = mock.Mock()
+        poller = CommandPoller("TOKEN", "42", tmp_path / "c.pause", notifier=notifier,
+                               session=fake_session(resp(upd(7, 42, "/areas"))),
+                               area_names=["Inbox", "Chat"], profile="work")
+        poller.poll_once()
+        sent = notifier.send.call_args[0][0]
+        assert "Inbox" in sent and "Chat" in sent and "work" in sent
 
     def test_drain_backlog_sets_offset_without_acting(self, tmp_path):
         from changedetector.control import is_paused

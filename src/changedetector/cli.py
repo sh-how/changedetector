@@ -344,7 +344,7 @@ def cmd_run(args) -> int:
     clear_paused(pause_path)       # a fresh start is always active, never silently paused
     write_heartbeat(run_path)
 
-    poller = _start_telegram_commands(cfg, secrets, pause_path)
+    poller = _start_telegram_commands(cfg, secrets, pause_path, args.config)
     try:
         runner.run(
             cfg, secrets,
@@ -360,8 +360,8 @@ def cmd_run(args) -> int:
     return 0
 
 
-def _start_telegram_commands(cfg, secrets, pause_path):
-    """Start the Telegram /pause /resume listener in a daemon thread, if enabled.
+def _start_telegram_commands(cfg, secrets, pause_path, config_path):
+    """Start the Telegram command listener in a daemon thread, if enabled.
 
     Returns the poller (so the caller can stop it) or None.
     """
@@ -370,11 +370,19 @@ def _start_telegram_commands(cfg, secrets, pause_path):
     import threading
 
     from .notifier import build_notifier
+    from .profiles import read_profiles
     from .telegram_commands import CommandPoller
+
+    # report what THIS monitor actually loaded (a config/profile change needs a
+    # restart, which starts a fresh poller with the new list)
+    area_names = [w.name for w in cfg.watchers]
+    names, active = read_profiles(config_path)
+    profile = active if (len(names) > 1 or (active and active != "default")) else None
 
     poller = CommandPoller(
         secrets.telegram_bot_token, secrets.telegram_chat_id, pause_path,
         notifier=build_notifier("telegram", secrets),
+        area_names=area_names, profile=profile,
     )
     threading.Thread(target=poller.run, daemon=True).start()
     return poller

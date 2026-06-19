@@ -17,12 +17,31 @@ log = logging.getLogger("changedetector.telegram_commands")
 
 API_BASE = "https://api.telegram.org"
 
-COMMANDS = {"/pause": "pause", "/resume": "resume"}
+COMMANDS = {"/pause": "pause", "/resume": "resume", "/areas": "areas", "/help": "help"}
 
 _REPLIES = {
     "pause": "Paused - alerts off.",
     "resume": "Resumed - monitoring active.",
 }
+
+HELP_TEXT = (
+    "changedetector commands:\n"
+    "/pause - silence alerts\n"
+    "/resume - turn alerts back on\n"
+    "/areas - show what's being watched\n"
+    "/help - this message"
+)
+
+
+def _format_areas(area_names, profile) -> str:
+    if not area_names:
+        return "No areas configured."
+    lines = []
+    if profile:
+        lines.append(f"Profile: {profile}")
+    count = len(area_names)
+    lines.append(f"Watching {count} area{'' if count == 1 else 's'}: {', '.join(area_names)}")
+    return "\n".join(lines)
 
 
 def parse_commands(updates_json: dict, allowed_chat_id) -> list:
@@ -55,24 +74,33 @@ def next_offset(updates_json: dict, current):
     return max(ids) + 1 if ids else current
 
 
-def apply_command(command: str, pause_path) -> str:
+def apply_command(command: str, pause_path, area_names=None, profile=None) -> str:
     """Perform a command's side effect; return the reply text (or None if unknown)."""
     if command == "pause":
         set_paused(pause_path)
-    elif command == "resume":
+        return _REPLIES["pause"]
+    if command == "resume":
         clear_paused(pause_path)
-    return _REPLIES.get(command)
+        return _REPLIES["resume"]
+    if command == "areas":
+        return _format_areas(area_names, profile)
+    if command == "help":
+        return HELP_TEXT
+    return None
 
 
 class CommandPoller:
     """Polls Telegram for commands and applies them. Inject ``session`` in tests."""
 
-    def __init__(self, token, chat_id, pause_path, notifier=None, session=None, poll_timeout=20):
+    def __init__(self, token, chat_id, pause_path, notifier=None, session=None,
+                 poll_timeout=20, area_names=None, profile=None):
         self._token = token
         self._chat_id = chat_id
         self._pause_path = pause_path
         self._notifier = notifier
         self._poll_timeout = poll_timeout
+        self._area_names = area_names
+        self._profile = profile
         self._offset = None
         self._stop = threading.Event()
         if session is None:
@@ -105,7 +133,7 @@ class CommandPoller:
         if not data.get("ok"):
             return False
         for command in parse_commands(data, self._chat_id):
-            reply = apply_command(command, self._pause_path)
+            reply = apply_command(command, self._pause_path, self._area_names, self._profile)
             log.info("telegram command: /%s", command)
             if self._notifier and reply:
                 try:
