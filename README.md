@@ -88,6 +88,18 @@ To have it start automatically when you log in, put a shortcut to
 
 All of these are in the tray menu too. Run `changedetector --help` for the full list.
 
+## Control from Telegram
+
+While the monitor is running, you can pause and resume it by messaging your bot:
+
+- **`/pause`** — silence alerts
+- **`/resume`** — turn them back on
+
+The bot replies to confirm. It only obeys messages from *your* chat (anyone else
+is ignored), and it uses long-polling, so no setup beyond your existing bot is
+needed. To turn this off, set `telegram_commands: false` under `runtime:` in
+`config.yaml`.
+
 ## Profiles (optional)
 
 A profile is a named set of areas — e.g. a `work` set and a `trading` set — that

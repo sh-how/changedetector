@@ -343,6 +343,8 @@ def cmd_run(args) -> int:
     clear_stop(stop_path)          # ignore any stale stop request
     clear_paused(pause_path)       # a fresh start is always active, never silently paused
     write_heartbeat(run_path)
+
+    poller = _start_telegram_commands(cfg, secrets, pause_path)
     try:
         runner.run(
             cfg, secrets,
@@ -351,9 +353,31 @@ def cmd_run(args) -> int:
             heartbeat=lambda: write_heartbeat(run_path),
         )
     finally:
+        if poller:
+            poller.stop()
         clear_heartbeat(run_path)
         clear_stop(stop_path)
     return 0
+
+
+def _start_telegram_commands(cfg, secrets, pause_path):
+    """Start the Telegram /pause /resume listener in a daemon thread, if enabled.
+
+    Returns the poller (so the caller can stop it) or None.
+    """
+    if cfg.alert.channel != "telegram" or not cfg.runtime.telegram_commands:
+        return None
+    import threading
+
+    from .notifier import build_notifier
+    from .telegram_commands import CommandPoller
+
+    poller = CommandPoller(
+        secrets.telegram_bot_token, secrets.telegram_chat_id, pause_path,
+        notifier=build_notifier("telegram", secrets),
+    )
+    threading.Thread(target=poller.run, daemon=True).start()
+    return poller
 
 
 def cmd_pause(args) -> int:

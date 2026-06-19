@@ -99,6 +99,49 @@ def test_remove_from_missing_file(tmp_path):
     assert _remove_watcher(str(tmp_path / "nope.yaml"), "X") == "not_found"
 
 
+class TestStartTelegramCommands:
+    def _cfg(self, channel="telegram", enabled=True):
+        from changedetector.config import build_config
+        data = {
+            "watchers": [{"name": "A", "region": {"left": 0, "top": 0, "width": 5, "height": 5}}],
+            "alert": {"channel": channel},
+            "runtime": {"telegram_commands": enabled},
+        }
+        env = {"CHANGEDETECTOR_TELEGRAM_BOT_TOKEN": "t", "CHANGEDETECTOR_TELEGRAM_CHAT_ID": "1"}
+        return build_config(data, env if channel == "telegram" else {})
+
+    def test_none_for_console_channel(self, tmp_path):
+        from changedetector.cli import _start_telegram_commands
+        cfg, secrets = self._cfg(channel="console")
+        assert _start_telegram_commands(cfg, secrets, tmp_path / "c.pause") is None
+
+    def test_none_when_disabled(self, tmp_path):
+        from changedetector.cli import _start_telegram_commands
+        cfg, secrets = self._cfg(channel="telegram", enabled=False)
+        assert _start_telegram_commands(cfg, secrets, tmp_path / "c.pause") is None
+
+    def test_starts_poller_for_telegram(self, tmp_path, monkeypatch):
+        import changedetector.telegram_commands as tc
+        started = {}
+
+        class FakePoller:
+            def __init__(self, token, chat_id, pause_path, notifier=None):
+                started["init"] = (token, chat_id)
+
+            def run(self):
+                started["ran"] = True
+
+            def stop(self):
+                started["stopped"] = True
+
+        monkeypatch.setattr(tc, "CommandPoller", FakePoller)
+        from changedetector.cli import _start_telegram_commands
+        cfg, secrets = self._cfg(channel="telegram")
+        poller = _start_telegram_commands(cfg, secrets, tmp_path / "c.pause")
+        assert isinstance(poller, FakePoller)
+        assert started["init"] == ("t", "1")
+
+
 def _profiles_cfg(tmp_path, active="work"):
     cfg = tmp_path / "config.yaml"
     cfg.write_text(

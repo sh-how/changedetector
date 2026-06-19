@@ -182,6 +182,15 @@ class TestLegacySingleRegion:
         cfg, _ = build_config({"region": {"left": 0, "top": 0, "width": 10, "height": 10}}, {})
         assert cfg.alert.channel == "console"
         assert cfg.capture.poll_interval_seconds > 0
+        assert cfg.runtime.telegram_commands is True  # on by default
+
+    def test_telegram_commands_can_be_disabled(self):
+        data = {
+            "region": {"left": 0, "top": 0, "width": 10, "height": 10},
+            "runtime": {"telegram_commands": False},
+        }
+        cfg, _ = build_config(data, {})
+        assert cfg.runtime.telegram_commands is False
 
 
 class TestSecretValidation:

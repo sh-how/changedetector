@@ -54,6 +54,7 @@ class RuntimeConfig:
     blank_frame_policy: str = "skip"
     log_level: str = "INFO"
     log_file: str = "changedetector.log"
+    telegram_commands: bool = True  # listen for /pause and /resume (telegram channel only)
 
 
 @dataclass
@@ -206,6 +207,7 @@ def _build_runtime(data: dict) -> RuntimeConfig:
         blank_frame_policy=raw.get("blank_frame_policy", RuntimeConfig.blank_frame_policy),
         log_level=raw.get("log_level", RuntimeConfig.log_level),
         log_file=raw.get("log_file", RuntimeConfig.log_file),
+        telegram_commands=raw.get("telegram_commands", RuntimeConfig.telegram_commands),
     )
     _require(
         rt.blank_frame_policy in VALID_BLANK_POLICIES,
